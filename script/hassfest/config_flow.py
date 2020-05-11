@@ -41,13 +41,22 @@ def validate_integration(config: Config, integration: Integration):
 
     config_flow = config_flow_file.read_text()
 
-    has_unique_id = (
-        "self.async_set_unique_id" in config_flow
-        or "config_entry_flow.register_discovery_flow" in config_flow
-        or "config_entry_oauth2_flow.AbstractOAuth2FlowHandler" in config_flow
-    )
+    sets_unique_id = "self.async_set_unique_id" in config_flow
+    is_discovery_flow = "config_entry_flow.register_discovery_flow" in config_flow
+    is_oauth_flow = "config_entry_oauth2_flow.AbstractOAuth2FlowHandler" in config_flow
+
+    has_unique_id = sets_unique_id or is_discovery_flow or is_oauth_flow
 
     if has_unique_id:
+        if (
+            # Test if not these 2, as these flows can still set unique ID.
+            not is_oauth_flow
+            and not is_discovery_flow
+        ) and "self._abort_if_unique_id_configured" not in config_flow:
+            integration.add_error(
+                "config_flow",
+                "Discovered flows need to abort if a unique ID is already configured by calling self._abort_if_unique_id_configured()",
+            )
         return
 
     if config.specific_integrations:
