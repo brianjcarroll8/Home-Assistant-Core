@@ -76,9 +76,18 @@ def removed_title_validator(config, integration, value):
 def lowercase_validator(value):
     """Validate value is lowercase."""
     if value.lower() != value:
-        raise vol.Invalid("Needs to be lowercase")
+        raise vol.Invalid(f"Value '{value}'' needs to be lowercase")
 
     return value
+
+
+def string_with_no_html(value):
+    """Validate that the value is a string without HTML."""
+    value = cv.string(value)
+    regex = re.compile(r"<[a-z][\s\S]*>")
+    if regex.search(value):
+        raise vol.Invalid("the string should not contain HTML")
+    return str(value)
 
 
 def gen_data_entry_schema(
@@ -91,20 +100,28 @@ def gen_data_entry_schema(
     """Generate a data entry schema."""
     step_title_class = vol.Required if require_step_title else vol.Optional
     schema = {
-        vol.Optional("flow_title"): cv.string_with_no_html,
+        vol.Optional("flow_title"): string_with_no_html,
         vol.Required("step"): {
             str: {
-                step_title_class("title"): cv.string_with_no_html,
-                vol.Optional("description"): cv.string_with_no_html,
-                vol.Optional("data"): {str: cv.string_with_no_html},
+                step_title_class("title"): string_with_no_html,
+                vol.Optional("description"): string_with_no_html,
+                vol.Optional("data"): cv.schema_with_slug_keys(
+                    string_with_no_html, slug_validator=lowercase_validator
+                ),
             }
         },
-        vol.Optional("error"): {str: cv.string_with_no_html},
-        vol.Optional("abort"): {str: cv.string_with_no_html},
-        vol.Optional("create_entry"): {str: cv.string_with_no_html},
+        vol.Optional("error"): cv.schema_with_slug_keys(
+            string_with_no_html, slug_validator=lowercase_validator
+        ),
+        vol.Optional("abort"): cv.schema_with_slug_keys(
+            string_with_no_html, slug_validator=lowercase_validator
+        ),
+        vol.Optional("create_entry"): cv.schema_with_slug_keys(
+            string_with_no_html, slug_validator=lowercase_validator
+        ),
     }
     if flow_title == REQUIRED:
-        schema[vol.Required("title")] = cv.string_with_no_html
+        schema[vol.Required("title")] = string_with_no_html
     elif flow_title == REMOVED:
         schema[vol.Optional("title", msg=REMOVED_TITLE_MSG)] = partial(
             removed_title_validator, config, integration
@@ -117,7 +134,7 @@ def gen_strings_schema(config: Config, integration: Integration):
     """Generate a strings schema."""
     return vol.Schema(
         {
-            vol.Optional("title"): cv.string_with_no_html,
+            vol.Optional("title"): string_with_no_html,
             vol.Optional("config"): gen_data_entry_schema(
                 config=config,
                 integration=integration,
@@ -131,10 +148,18 @@ def gen_strings_schema(config: Config, integration: Integration):
                 require_step_title=False,
             ),
             vol.Optional("device_automation"): {
-                vol.Optional("action_type"): {str: cv.string_with_no_html},
-                vol.Optional("condition_type"): {str: cv.string_with_no_html},
-                vol.Optional("trigger_type"): {str: cv.string_with_no_html},
-                vol.Optional("trigger_subtype"): {str: cv.string_with_no_html},
+                vol.Optional("action_type"): cv.schema_with_slug_keys(
+                    string_with_no_html, slug_validator=lowercase_validator
+                ),
+                vol.Optional("condition_type"): cv.schema_with_slug_keys(
+                    string_with_no_html, slug_validator=lowercase_validator
+                ),
+                vol.Optional("trigger_type"): cv.schema_with_slug_keys(
+                    string_with_no_html, slug_validator=lowercase_validator
+                ),
+                vol.Optional("trigger_subtype"): cv.schema_with_slug_keys(
+                    string_with_no_html, slug_validator=lowercase_validator
+                ),
             },
             vol.Optional("state"): cv.schema_with_slug_keys(
                 cv.schema_with_slug_keys(str, slug_validator=lowercase_validator),
@@ -203,7 +228,7 @@ def gen_platform_strings_schema(config: Config, integration: Integration):
     )
 
 
-ONBOARDING_SCHEMA = vol.Schema({vol.Required("area"): {str: cv.string_with_no_html}})
+ONBOARDING_SCHEMA = vol.Schema({vol.Required("area"): {str: string_with_no_html}})
 
 
 def validate_translation_file(config: Config, integration: Integration, all_strings):

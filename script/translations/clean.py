@@ -88,10 +88,21 @@ def run():
     key_data = lokalise.keys_list(
         {"filter_keys": ",".join(missing_keys), "limit": 1000}
     )
-    if len(key_data) != len(missing_keys):
+
+    # Lokalise is not case sensitive, we are!
+    filtered_key_data = []
+    for key in key_data:
+        if key["key_name"]["web"] in missing_keys:
+            filtered_key_data.append(key)
+
+    if len(filtered_key_data) != len(missing_keys):
         print(
-            f"Lookin up key in Lokalise returns {len(key_data)} results, expected {len(missing_keys)}"
+            f"Lookin up key in Lokalise returns {len(filtered_key_data)} results, expected {len(missing_keys)}"
         )
+        missing_keys = set(missing_keys)
+        returned_keys = {key["key_name"]["web"] for key in filtered_key_data}
+        print("Not found keys:", ", ".join(sorted(missing_keys - returned_keys)))
+        print("Extra keys:", ", ".join(sorted(returned_keys - missing_keys)))
         return 1
 
     print(f"Deleting {len(missing_keys)} keys:")
@@ -101,6 +112,6 @@ def run():
     while input("Type YES to delete these keys: ") != "YES":
         pass
 
-    print(lokalise.keys_delete_multiple([key["key_id"] for key in key_data]))
+    print(lokalise.keys_delete_multiple([key["key_id"] for key in filtered_key_data]))
 
     return 0
