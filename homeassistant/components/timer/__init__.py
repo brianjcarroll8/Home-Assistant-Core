@@ -64,6 +64,18 @@ UPDATE_FIELDS = {
 }
 
 
+def _format_timedelta(delta):
+    if isinstance(delta, str):
+        return delta
+    if isinstance(delta, int):
+        total_seconds = delta
+    else:
+        total_seconds = delta.total_seconds()
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{int(hours)}:{int(minutes):02}:{int(seconds):02}"
+
+
 def _none_to_empty_dict(value):
     if value is None:
         return {}
@@ -160,7 +172,7 @@ class TimerStorageCollection(collection.StorageCollection):
         """Validate the config is valid."""
         data = self.CREATE_SCHEMA(data)
         # make duration JSON serializeable
-        data[CONF_DURATION] = str(data[CONF_DURATION])
+        data[CONF_DURATION] = _format_timedelta(data[CONF_DURATION])
         return data
 
     @callback
@@ -172,7 +184,7 @@ class TimerStorageCollection(collection.StorageCollection):
         """Return a new updated data object."""
         data = {**data, **self.UPDATE_SCHEMA(update_data)}
         # make duration JSON serializeable
-        data[CONF_DURATION] = str(data[CONF_DURATION])
+        data[CONF_DURATION] = _format_timedelta(data[CONF_DURATION])
         return data
 
 
@@ -225,9 +237,9 @@ class Timer(RestoreEntity):
     def state_attributes(self):
         """Return the state attributes."""
         return {
-            ATTR_DURATION: str(self._config[CONF_DURATION]),
+            ATTR_DURATION: _format_timedelta(self._config[CONF_DURATION]),
             ATTR_EDITABLE: self.editable,
-            ATTR_REMAINING: str(self._remaining),
+            ATTR_REMAINING: _format_timedelta(self._remaining),
         }
 
     @property
