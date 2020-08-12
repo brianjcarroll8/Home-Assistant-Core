@@ -59,6 +59,12 @@ class ZWaveServices:
             ),
         )
 
+        self._hass.services.async_register(
+            const.DOMAIN,
+            "migrate_zwave_integration",
+            self.async_migrate_zwave_integration,
+        )
+
     @callback
     def async_set_config_parameter(self, service):
         """Set a config parameter to a node."""
@@ -136,3 +142,9 @@ class ZWaveServices:
         instance_id = service.data[const.ATTR_INSTANCE_ID]
         instance = self._manager.get_instance(instance_id)
         instance.remove_node()
+
+    async def async_migrate_zwave_integration(self, service):
+        """Migrate data from the Z-Wave integration."""
+        zwave = self._hass.components.zwave
+        data = await zwave.async_record_ozw_migration_info(self._hass)
+        _LOGGER.warning("Migration data: %s", data)
