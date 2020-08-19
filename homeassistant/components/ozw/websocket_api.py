@@ -9,7 +9,7 @@ from homeassistant.components import websocket_api
 from homeassistant.core import callback
 
 from .const import DOMAIN, MANAGER, NODES_VALUES, OPTIONS
-from .migration import async_get_own_migration_info, async_migrate, map_node_values
+from .migration import async_get_migration_data, async_migrate, map_node_values
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -51,11 +51,11 @@ async def migrate_zwave(hass, connection, msg):
         return
 
     zwave = hass.components.zwave
-    zwave_data = await zwave.async_record_ozw_migration_info(hass)
+    zwave_data = await zwave.async_get_ozw_migration_data(hass)
     _LOGGER.debug("Migration zwave data: %s", zwave_data)
 
     nodes_values = hass.data[DOMAIN][NODES_VALUES]
-    ozw_data = await async_get_own_migration_info(hass, nodes_values)
+    ozw_data = await async_get_migration_data(hass, nodes_values)
     _LOGGER.debug("Migration ozw data: %s", ozw_data)
 
     can_migrate = map_node_values(zwave_data, ozw_data)
