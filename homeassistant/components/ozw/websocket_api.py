@@ -8,7 +8,8 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import callback
 
-from .const import DOMAIN, MANAGER, OPTIONS
+from .const import DOMAIN, MANAGER, NODES_VALUES, OPTIONS
+from .migration import async_get_own_migration_info, async_migrate, map_node_values
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ TYPE = "type"
 ID = "id"
 OZW_INSTANCE = "ozw_instance"
 NODE_ID = "node_id"
+DRY_RUN = "dry_run"
 
 
 @callback
@@ -27,6 +29,59 @@ def async_register_api(hass):
     websocket_api.async_register_command(hass, websocket_node_status)
     websocket_api.async_register_command(hass, websocket_node_statistics)
     websocket_api.async_register_command(hass, websocket_refresh_node_info)
+
+
+@websocket_api.require_admin
+@websocket_api.async_response
+@websocket_api.websocket_command(
+    {
+        vol.Required(TYPE): "ozw/migrate_zwave",
+        vol.Optional(DRY_RUN, default=True): vol.Coerce(bool),
+    }
+)
+async def migrate_zwave(hass, connection, msg):
+    """Migrate the zwave integration device and entity data to ozw integration."""
+    if "zwave" not in hass.config.components:
+        _LOGGER.error("Can not migrate, zwave integration is not loaded")
+        connection.send_message(
+            websocket_api.error_message(
+                msg["id"], "zwave_not_loaded", "zwave integration is not loaded"
+            )
+        )
+        return
+
+    zwave = hass.components.zwave
+    zwave_data = await zwave.async_record_ozw_migration_info(hass)
+    _LOGGER.debug("Migration zwave data: %s", zwave_data)
+
+    nodes_values = hass.data[DOMAIN][NODES_VALUES]
+    ozw_data = await async_get_own_migration_info(hass, nodes_values)
+    _LOGGER.debug("Migration ozw data: %s", ozw_data)
+
+    can_migrate = map_node_values(zwave_data, ozw_data)
+
+    zwave_entity_ids = [
+        entry["entity_entry"].entity_id for entry in zwave_data.values()
+    ]
+    ozw_entity_ids = [entry["entity_entry"].entity_id for entry in ozw_data.values()]
+    migration_entity_map = {
+        zwave_entry["entity_entry"].entity_id: ozw_entity_id
+        for ozw_entity_id, zwave_entry in can_migrate.items()
+    }
+    _LOGGER.debug("Migration entity map: %s", migration_entity_map)
+
+    if not msg[DRY_RUN]:
+        await async_migrate(hass, can_migrate)
+
+    connection.send_result(
+        msg[ID],
+        {
+            "zwave_entity_ids": zwave_entity_ids,
+            "ozw_entity_ids": ozw_entity_ids,
+            "migration_entity_map": migration_entity_map,
+            "migrated": not msg[DRY_RUN],
+        },
+    )
 
 
 @websocket_api.websocket_command({vol.Required(TYPE): "ozw/get_instances"})
