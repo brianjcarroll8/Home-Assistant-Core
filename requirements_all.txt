@@ -1120,7 +1120,7 @@ proliphix==0.4.1
 prometheus_client==0.7.1
 
 # homeassistant.components.tensorflow
-protobuf==3.12.2
+protobuf==3.18.3
 
 # homeassistant.components.proxmoxve
 proxmoxer==1.1.1
